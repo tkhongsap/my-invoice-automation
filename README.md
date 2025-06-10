@@ -26,13 +26,20 @@ This project automatically generates screenshots from PDF invoice files.
 
 ## Usage
 
-### Generate Screenshots from PDFs
+### Generate Full-Page Invoice Screenshots from PDFs (Recommended)
 1. **Place PDF files** in the `invoices/` folder
-2. **Run the script:**
+2. **Run the screenshot generator:**
    ```bash
    python scr/pdf_screenshot_generator.py
    ```
    Or double-click `run_screenshot_generator.bat` on Windows
+
+   This enhanced version:
+   - Renders PDFs at 150 DPI for optimal quality
+   - Generates full-page screenshots (no cropping for better compatibility)
+   - Creates high-resolution images (1275x1650 pixels) for clear detail viewing
+   - Saves to `output/screenshot_zoomed/` folder
+   - Provides idempotent operation (skips existing files)
 
 ### Organize Screenshots in Excel
 1. **After generating screenshots**, create an organized Excel file:
@@ -41,36 +48,48 @@ This project automatically generates screenshots from PDF invoice files.
    ```
    Or double-click `run_excel_organizer.bat` on Windows
 
+   The organizer creates **one large screenshot per Excel sheet** for maximum readability and easy navigation.
+
 ## Features
 
-### PDF Screenshot Generator
+### PDF Screenshot Generator (Full Page Version)
 - Processes all PDF files in the `invoices/` folder
-- Generates high-quality PNG screenshots (200 DPI)
+- Generates high-quality PNG screenshots (150 DPI for optimal resolution)
+- Creates full-page screenshots (no cropping) for better compatibility
+- High-resolution output (1275x1650 pixels) for clear detail viewing
 - Captures the first page of each PDF
-- Saves screenshots with corresponding filenames
-- Provides progress feedback and error handling
+- Saves screenshots with corresponding filenames to `output/screenshot_zoomed/`
+- Provides idempotent operation (skips existing files)
+- Clear progress feedback with [OK], [SKIP], and [ERROR] status indicators
 - Creates output directory automatically if it doesn't exist
 
-### Excel Screenshot Organizer
-- Creates an Excel file with screenshots organized in 2 columns
+### Excel Screenshot Organizer (One Image Per Sheet)
+- Creates an Excel file with one large screenshot per sheet (40 sheets for 40 invoices)
 - Sorts screenshots from oldest to newest based on filename
-- Automatically resizes images to fit Excel cells
-- Includes filename labels below each screenshot
-- Generates a professional-looking spreadsheet for easy viewing
+- Large image display (1000px wide) for easy detail reading
+- Includes filename labels above each screenshot
+- Sheet tabs for easy navigation between invoices
+- No image compression - preserves full detail for review
 
 ## Output
 
 ### Screenshots
-Screenshots are saved as PNG files in `output/screenshot/` with names corresponding to the original PDF files:
+Full-page screenshots are saved as PNG files in `output/screenshot_zoomed/` with names corresponding to the original PDF files:
 - `American Express - Account Activity.pdf` → `American Express - Account Activity.png`
 - `American Express - Account Activity-1.pdf` → `American Express - Account Activity-1.png`
 
+These enhanced screenshots feature:
+- High resolution (1275x1650 pixels) for clear detail viewing
+- Full-page content (no cropping) for complete invoice visibility
+- Optimized file sizes (typically 70-85KB per PNG)
+
 ### Excel File
 The organized Excel file is saved as `output/invoice_screenshots_organized.xlsx` with:
-- 2 columns layout for easy comparison
-- Screenshots sorted from oldest to newest
-- Filename labels for easy identification
-- Professional formatting for presentations or reviews
+- One large screenshot per sheet for maximum readability
+- Screenshots sorted from oldest to newest (40 sheets total)
+- Large image display (1000px wide) for easy detail reading
+- Sheet tabs for quick navigation between invoices
+- Filename labels above each image for easy identification
 
 ## Requirements
 

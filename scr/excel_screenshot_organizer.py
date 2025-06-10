@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Excel Screenshot Organizer
+Excel Screenshot Organizer - One Image Per Sheet
 
-This script creates an Excel file with screenshots organized in 2 columns,
+This script creates an Excel file with one large screenshot per sheet,
 sorted from oldest to newest based on the filename numbering.
+Each image is sized large enough to see details clearly.
 """
 
 import os
@@ -13,13 +14,13 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 from PIL import Image
-import numpy as np
 
 def setup_directories():
     """Setup and validate directories."""
     base_dir = Path(__file__).parent.parent
-    screenshots_dir = base_dir / "output" / "screenshot"
+    screenshots_dir = base_dir / "output" / "screenshot_zoomed"
     output_dir = base_dir / "output"
     
     if not screenshots_dir.exists():
@@ -58,161 +59,74 @@ def get_sorted_screenshots(screenshots_dir):
     print(f"Found {len(sorted_files)} screenshot files")
     return sorted_files
 
-def crop_white_borders(img, border_color=255, tolerance=10):
-    """Crop white borders from an image."""
-    # Convert to numpy array
-    img_array = np.array(img)
-    
-    # If image has alpha channel, use RGB only
-    if len(img_array.shape) == 3 and img_array.shape[2] == 4:
-        img_array = img_array[:, :, :3]
-    
-    # Create a mask for non-white pixels
-    if len(img_array.shape) == 3:
-        # For color images
-        mask = np.any(img_array < (border_color - tolerance), axis=2)
-    else:
-        # For grayscale images
-        mask = img_array < (border_color - tolerance)
-    
-    # Find the bounding box of non-white pixels
-    rows = np.any(mask, axis=1)
-    cols = np.any(mask, axis=0)
-    
-    if not np.any(rows) or not np.any(cols):
-        # If the entire image is white, return original
-        return img
-    
-    # Get the bounding box
-    top, bottom = np.where(rows)[0][[0, -1]]
-    left, right = np.where(cols)[0][[0, -1]]
-    
-    # Add a small margin (10 pixels) to avoid cutting too close
-    margin = 10
-    top = max(0, top - margin)
-    bottom = min(img.height - 1, bottom + margin)
-    left = max(0, left - margin)
-    right = min(img.width - 1, right + margin)
-    
-    # Crop the image
-    return img.crop((left, top, right + 1, bottom + 1))
-
-def process_image_for_excel(image_path, max_width=400, max_height=500):
-    """Crop white borders and resize image to fit nicely in Excel cell while maintaining aspect ratio."""
+def create_excel_with_large_screenshots(screenshots, output_path):
+    """Create Excel file with one large screenshot per sheet."""
     try:
-        with Image.open(image_path) as img:
-            # First, crop white borders to show content more clearly
-            print(f"  Cropping white borders from {image_path.name}...")
-            cropped_img = crop_white_borders(img)
-            
-            # Calculate new size maintaining aspect ratio
-            img_width, img_height = cropped_img.size
-            
-            # Calculate scaling factor
-            width_ratio = max_width / img_width
-            height_ratio = max_height / img_height
-            scale_factor = min(width_ratio, height_ratio)
-            
-            new_width = int(img_width * scale_factor)
-            new_height = int(img_height * scale_factor)
-            
-            # Resize image if needed
-            if scale_factor < 1.0:
-                resized_img = cropped_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            else:
-                resized_img = cropped_img
-                new_width, new_height = img_width, img_height
-            
-            # Create safe filename for temp file
-            safe_name = image_path.name.replace(" ", "_").replace("-", "_")
-            temp_path = image_path.parent / f"temp_processed_{safe_name}"
-            resized_img.save(temp_path, "PNG", optimize=True)
-            
-            return temp_path, new_width, new_height
-            
-    except Exception as e:
-        print(f"Error processing image {image_path}: {str(e)}")
-        return image_path, 300, 400
-
-def create_excel_with_screenshots(screenshots, output_path):
-    """Create Excel file with screenshots organized in 2 columns."""
-    try:
-        # Create workbook and worksheet
+        # Create workbook
         wb = Workbook()
-        ws = wb.active
-        ws.title = "Invoice Screenshots"
         
-        # Set column headers
-        ws['A1'] = "Column 1"
-        ws['B1'] = "Column 2"
+        # Remove the default sheet - we'll create our own
+        wb.remove(wb.active)
         
-        # Set column widths (in Excel units)
-        ws.column_dimensions['A'].width = 50
-        ws.column_dimensions['B'].width = 50
-        
-        # Track current row
-        current_row = 3
-        
-        # Process screenshots in pairs for 2 columns
-        for i in range(0, len(screenshots), 2):
-            print(f"Processing row {(i//2) + 1}: {screenshots[i].name}", end="")
+        # Process each screenshot
+        for i, screenshot_path in enumerate(screenshots):
+            print(f"Processing sheet {i+1}/{len(screenshots)}: {screenshot_path.name}")
             
-            # Add filename above image for Column A
-            ws[f"A{current_row}"] = screenshots[i].stem
-            ws[f"A{current_row}"].font = ws[f"A{current_row}"].font.copy(bold=True)
+            # Create new worksheet for this screenshot
+            sheet_name = f"Invoice_{i+1}"
+            ws = wb.create_sheet(title=sheet_name)
             
-            # Set row height for image (in points)
-            ws.row_dimensions[current_row + 1].height = 250
+            # Add title with filename
+            ws['A1'] = screenshot_path.stem
+            ws['A1'].font = ws['A1'].font.copy(bold=True)
+            ws.row_dimensions[1].height = 25
             
-            # Process and crop first image (Column A)
-            processed_path1, width1, height1 = process_image_for_excel(screenshots[i])
-            img1 = ExcelImage(processed_path1)
-            # Scale image to fit in cell
-            img1.width = 300
-            img1.height = 400
+            # Set column widths for large display
+            ws.column_dimensions['A'].width = 120
+            ws.column_dimensions['B'].width = 20
+            ws.column_dimensions['C'].width = 20
             
-            # Position image in cell A (one row below filename)
-            cell_a = f"A{current_row + 1}"
-            img1.anchor = cell_a
-            ws.add_image(img1)
-            
-            # Process second image (Column B) if it exists
-            if i + 1 < len(screenshots):
-                print(f" and {screenshots[i + 1].name}")
+            try:
+                # Load and resize image for optimal display
+                with Image.open(screenshot_path) as img:
+                    img_width, img_height = img.size
+                    
+                    # Calculate size for good visibility (aim for ~1000px wide max)
+                    max_display_width = 1000
+                    if img_width > max_display_width:
+                        scale_factor = max_display_width / img_width
+                        display_width = max_display_width
+                        display_height = int(img_height * scale_factor)
+                    else:
+                        display_width = img_width
+                        display_height = img_height
+                    
+                    print(f"  Image size: {img_width}x{img_height} -> Display: {display_width}x{display_height}")
+                    
+                    # Create Excel image object
+                    excel_img = ExcelImage(screenshot_path)
+                    
+                    # Set image size for good visibility
+                    excel_img.width = display_width
+                    excel_img.height = display_height
+                    
+                    # Position image starting from row 3 (leave space for title)
+                    excel_img.anchor = 'A3'
+                    ws.add_image(excel_img)
+                    
+                    # Set row height to accommodate the image
+                    row_height_points = display_height * 0.75  # Convert pixels to points
+                    for row in range(3, 3 + int(display_height / 20)):  # Approximate rows needed
+                        ws.row_dimensions[row].height = min(400, max(15, row_height_points / 10))
                 
-                # Add filename above image for Column B
-                ws[f"B{current_row}"] = screenshots[i + 1].stem
-                ws[f"B{current_row}"].font = ws[f"B{current_row}"].font.copy(bold=True)
-                
-                # Process and crop second image
-                processed_path2, width2, height2 = process_image_for_excel(screenshots[i + 1])
-                img2 = ExcelImage(processed_path2)
-                # Scale image to fit in cell
-                img2.width = 300
-                img2.height = 400
-                
-                # Position image in cell B (one row below filename)
-                cell_b = f"B{current_row + 1}"
-                img2.anchor = cell_b
-                ws.add_image(img2)
-            else:
-                print()
-            
-            # Move to next row (leave space for filename and image)
-            current_row += 22
+            except Exception as img_error:
+                print(f"  Error processing image {screenshot_path.name}: {str(img_error)}")
+                # Add error message to sheet
+                ws['A3'] = f"Error loading image: {str(img_error)}"
+                continue
         
         # Save the workbook
         wb.save(output_path)
-        
-        # Clean up temporary processed files
-        print("\nCleaning up temporary files...")
-        temp_files = list(screenshots[0].parent.glob("temp_processed_*"))
-        for temp_file in temp_files:
-            try:
-                temp_file.unlink()
-            except Exception as e:
-                print(f"Warning: Could not delete temp file {temp_file}: {e}")
-        
         print(f"\n✓ Excel file created successfully: {output_path}")
         return True
         
@@ -221,9 +135,9 @@ def create_excel_with_screenshots(screenshots, output_path):
         return False
 
 def main():
-    """Main function to create Excel file with organized screenshots."""
-    print("Excel Screenshot Organizer")
-    print("=" * 50)
+    """Main function to create Excel file with large screenshots."""
+    print("Excel Screenshot Organizer - One Image Per Sheet")
+    print("=" * 60)
     
     # Setup directories
     screenshots_dir, output_dir = setup_directories()
@@ -238,19 +152,19 @@ def main():
     # Create output Excel file path
     excel_path = output_dir / "invoice_screenshots_organized.xlsx"
     
-    # Create Excel file with screenshots
+    # Create Excel file with large screenshots
     print(f"\nCreating Excel file with {len(screenshots)} screenshots...")
-    print("Organizing in 2 columns, sorted from oldest to newest...")
-    print("Features: Cropping white borders, filenames above images")
+    print("Format: One large screenshot per sheet for maximum readability")
     
-    if create_excel_with_screenshots(screenshots, excel_path):
-        print(f"\n" + "=" * 50)
+    if create_excel_with_large_screenshots(screenshots, excel_path):
+        print(f"\n" + "=" * 60)
         print("✅ Excel file creation complete!")
         print(f"📁 File saved: {excel_path}")
         print(f"📊 Total screenshots: {len(screenshots)}")
-        print(f"📋 Layout: 2 columns, {(len(screenshots) + 1) // 2} rows")
-        print("✨ Improvements: Cropped borders for clearer content, filenames on top")
+        print(f"📋 Layout: One large image per sheet ({len(screenshots)} sheets)")
+        print("✨ Enhanced readability: Large images for easy detail viewing")
         print("\nYou can now open the Excel file to view your organized screenshots!")
+        print("Use the sheet tabs at the bottom to navigate between invoices.")
     else:
         print("\n❌ Failed to create Excel file")
         sys.exit(1)
